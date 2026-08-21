@@ -123,33 +123,32 @@ async function burn(mode) {
 </html>"""
 
 
+# the slack side rides along inside this same process. has to live at
+# module level — render runs `gunicorn web:app`, which only imports us,
+# and an __main__ guard would never fire there.
+if (
+    os.environ.get("RUN_SLACK_BOT") == "1"
+    and os.environ.get("SLACK_BOT_TOKEN")
+    and os.environ.get("SLACK_APP_TOKEN")
+):
+    def run_slack():
+        # imports live in here on purpose: bot.py builds its App (and
+        # calls auth.test) at import time, so a bad token must only
+        # kill this thread, never the whole web service
+        try:
+            import bot as slack_side
+            from slack_bolt.adapter.socket_mode import SocketModeHandler
+
+            SocketModeHandler(
+                slack_side.app, os.environ["SLACK_APP_TOKEN"]
+            ).connect()
+            print("slack side connected", flush=True)
+        except Exception as e:
+            print(f"slack side failed to connect: {e}", flush=True)
+
+    threading.Thread(target=run_slack, daemon=True).start()
+
+
 if __name__ == "__main__":
-    # one process, two jobs: the browser demo + the actual slack bot.
-    # socket mode needs no public port, it just needs to stay alive,
-    # so it can piggyback on the same free render service.
-    if (
-        os.environ.get("RUN_SLACK_BOT") == "1"
-        and os.environ.get("SLACK_BOT_TOKEN")
-        and os.environ.get("SLACK_APP_TOKEN")
-    ):
-        def run_slack():
-            # imports live in here on purpose: bot.py builds its App (and
-            # calls auth.test) at import time, so a bad token must only
-            # kill this thread, never the whole web service
-            try:
-                import bot as slack_side
-                from slack_bolt.adapter.socket_mode import SocketModeHandler
-
-                SocketModeHandler(
-                    slack_side.app, os.environ["SLACK_APP_TOKEN"]
-                ).connect()
-                print("slack side connected")
-            except Exception as e:
-                print(f"slack side failed to connect: {e}")
-
-        threading.Thread(target=run_slack, daemon=True).start()
-    else:
-        print("slack side off (RUN_SLACK_BOT != 1 or missing tokens)")
-
     # render injects PORT, locally we default to 5000
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

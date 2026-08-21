@@ -1,0 +1,15 @@
+# render.com blueprint. on render: new + -> blueprint -> point at this repo.
+# it reads this file and wires everything up. paste the secrets when asked.
+
+services:
+  - type: web
+    name: roasty-bot-demo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn web:app -w 1 --threads 4
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENCODE_API_KEY
+        sync: false

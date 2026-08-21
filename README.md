@@ -64,6 +64,24 @@ python bot.py
 
 test in #bot-spam or your own channel. not in #general. please.
 
+## try it without slack
+
+same roast engine, browser face:
+
+```shell
+python web.py   # -> http://localhost:5000
+```
+
+<!-- drop a gif of the bot doing its thing at docs/demo.gif and uncomment:
+<img src="docs/demo.gif" alt="roasty in action" width="600">
+-->
+
+### putting it on render (free)
+
+push this repo to github, then on [render.com](https://render.com): **new + → blueprint** → pick the repo. it reads `render.yaml` and does the rest. paste `GEMINI_API_KEY` / `OPENCODE_API_KEY` when asked — never commit them.
+
+free tier sleeps after ~15 idle minutes, so the first visitor eats a ~30s cold start. that's the price of $0.
+
 ## keeping it alive 24/7 (nest)
 
 clone the repo, recreate `.env` by hand (it's gitignored on purpose), then let systemd babysit it:

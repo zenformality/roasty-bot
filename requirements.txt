@@ -1,3 +1,5 @@
 slack-bolt
 python-dotenv
 google-genai
+flask
+gunicorn

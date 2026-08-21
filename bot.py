@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
+import md
 import roaster
 from responses import HELP_TEXT, PING_TEXT
 
@@ -43,7 +44,7 @@ def ping(ack, respond):
     start = time.perf_counter()
     ack()
     ms = int((time.perf_counter() - start) * 1000)
-    respond(text=PING_TEXT.format(latency=ms))
+    respond(response_type="in_channel", text=PING_TEXT.format(latency=ms))
 
 
 @app.command("/roasty-roast")
@@ -51,16 +52,16 @@ def roast(ack, respond, command, client):
     ack()
     hit = MENTION.search(command.get("text", ""))
     if not hit:
-        respond(text="tag your victim first → `/roasty-roast @someone`")
+        respond(response_type="in_channel", text="tag your victim first → `/roasty-roast @someone`")
         return
     victim = name_of(client, hit.group(1))
 
     def burn():
         try:
-            respond(text=f"hey {victim}! {roaster.generate_roast(victim)}")
+            respond(response_type="in_channel", text=f"hey {victim}! {md.to_slack(roaster.generate_roast(victim))}")
         except Exception as e:
             log.error("roast blew up: %s", e)
-            respond(text=f"hey {victim}! you broke the bot. impressive.")
+            respond(response_type="in_channel", text=f"hey {victim}! you broke the bot. impressive.")
 
     later(burn)
 
@@ -72,10 +73,10 @@ def selfroast(ack, respond, command, client):
 
     def burn():
         try:
-            respond(text=roaster.selfroast(who))
+            respond(response_type="in_channel", text=md.to_slack(roaster.selfroast(who)))
         except Exception as e:
             log.error("selfroast blew up: %s", e)
-            respond(text="the roast engine died mid-sentence. even that is your fault.")
+            respond(response_type="in_channel", text="the roast engine died mid-sentence. even that is your fault.")
 
     later(burn)
 
@@ -85,15 +86,15 @@ def chat(ack, respond, command):
     ack()
     msg = command.get("text", "").strip()
     if not msg:
-        respond(text="say something first → `/roasty-chat hello`")
+        respond(response_type="in_channel", text="say something first → `/roasty-chat hello`")
         return
 
     def burn():
         try:
-            respond(text=roaster.chat_roast(msg))
+            respond(response_type="in_channel", text=md.to_slack(roaster.chat_roast(msg)))
         except Exception as e:
             log.error("chat blew up: %s", e)
-            respond(text="my comeback was so good it crashed me. you're welcome.")
+            respond(response_type="in_channel", text="my comeback was so good it crashed me. you're welcome.")
 
     later(burn)
 
@@ -101,7 +102,7 @@ def chat(ack, respond, command):
 @app.command("/roasty-help")
 def help_menu(ack, respond):
     ack()
-    respond(text=HELP_TEXT)
+    respond(response_type="in_channel", text=HELP_TEXT)
 
 
 @app.event("app_mention")
@@ -112,9 +113,9 @@ def mentioned(event, say, client):
     def burn():
         try:
             if text:
-                say(text=roaster.chat_roast(text))
+                say(text=md.to_slack(roaster.chat_roast(text)))
             else:
-                say(text=roaster.generate_roast(name_of(client, who_id)))
+                say(text=md.to_slack(roaster.generate_roast(name_of(client, who_id))))
         except Exception as e:
             log.error("mention blew up: %s", e)
             say(text="i had something devastating ready. the internet ate it.")

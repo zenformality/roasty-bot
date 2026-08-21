@@ -1,5 +1,9 @@
 # render.com blueprint. on render: new + -> blueprint -> point at this repo.
 # it reads this file and wires everything up. paste the secrets when asked.
+#
+# this ONE free service runs both the browser demo and the slack bot.
+# RUN_SLACK_BOT=1 makes web.py spin up the socket mode connection in a
+# background thread next to flask.
 
 services:
   - type: web
@@ -7,9 +11,15 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn web:app -w 1 --threads 4
+    startCommand: gunicorn web:app -w 1 --threads 8
     envVars:
       - key: GEMINI_API_KEY
         sync: false
       - key: OPENCODE_API_KEY
         sync: false
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: SLACK_APP_TOKEN
+        sync: false
+      - key: RUN_SLACK_BOT
+        value: "1"

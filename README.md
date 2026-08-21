@@ -76,48 +76,26 @@ python web.py   # -> http://localhost:5000
 <img src="docs/demo.gif" alt="roasty in action" width="600">
 -->
 
-### putting it on render (free)
+## hosting everything on render (free)
 
-push this repo to github, then on [render.com](https://render.com): **new + → blueprint** → pick the repo. it reads `render.yaml` and does the rest. paste `GEMINI_API_KEY` / `OPENCODE_API_KEY` when asked — never commit them.
+one free render service runs both things — the browser demo AND the slack bot.
+socket mode doesn't need a public port, it just needs to stay awake, so it
+piggybacks on the same service (`RUN_SLACK_BOT=1` makes `web.py` spin up the
+slack connection in a thread next to flask).
 
-free tier sleeps after ~15 idle minutes, so the first visitor eats a ~30s cold start. that's the price of $0.
+1. push this repo to github
+2. on [render.com](https://render.com): **new + → blueprint** → pick the repo — it reads `render.yaml`
+3. paste your keys when asked:
+   - `GEMINI_API_KEY` / `OPENCODE_API_KEY` — ai brains
+   - `SLACK_BOT_TOKEN` / `SLACK_APP_TOKEN` — the bot itself
 
-## keeping it alive 24/7 (nest)
+free tier sleeps after ~15 idle minutes, which would kill the slack connection
+too. that's what `.github/workflows/keep-alive.yml` is for: a github actions
+cron pokes the demo url every 10 minutes. after your first deploy, add your url
+to the repo's **settings → secrets and variables → actions** as `DEMO_URL`.
 
-clone the repo, recreate `.env` by hand (it's gitignored on purpose), then let systemd babysit it:
-
-```shell
-git clone https://github.com/<you>/roasty-bot
-cd roasty-bot
-python3 -m venv venv
-venv/bin/pip install -r requirements.txt
-nano .env   # paste your tokens again
-```
-
-`/etc/systemd/system/roastybot.service`:
-
-```ini
-[Unit]
-Description=RoastyBot
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-Restart=always
-RestartSec=5
-WorkingDirectory=/root/roasty-bot
-ExecStart=/root/roasty-bot/venv/bin/python bot.py
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```shell
-systemctl daemon-reload
-systemctl enable --now roastybot.service
-journalctl -u roastybot.service -f   # watch it work
-```
+heads up: github disables scheduled workflows after ~60 days without any
+commits. pushing literally anything resets the clock.
 
 ## when stuff breaks
 

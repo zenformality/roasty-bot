@@ -1,10 +1,11 @@
-# roast engine. the order matters:
-#   1. gemini (3 free models, one retry each)
-#   2. opencode zen (free tier, flaky, but someone else's GPU)
-#   3. canned lines from responses.py so we're never speechless
+# roast engine. two providers race in parallel, first useful answer wins,
+# and whichever model answered last gets tried first next round so we stop
+# paying dead models' rent on every single roast.
 
 import logging
 import os
+import queue
+import threading
 import time
 
 import httpx
@@ -17,14 +18,13 @@ from responses import fallback_chat, fallback_roast, fallback_selfroast
 log = logging.getLogger("roasty.ai")
 
 GEMINI_MODELS = (
-    "gemini-3.7-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-2.5-flash-lite",
+    "gemini-3.5-flash-lite",    # survived google's culling, fast, big free quota
+    "gemini-3.7-flash",         # fancy but flaky from shared ips
 )
 
 ZEN_MODELS = (
-    "deepseek-v4-flash-free",   # user's pick, goes down a lot
     "laguna-s-2.1-free",        # reliable-ish
+    "deepseek-v4-flash-free",   # user's pick, goes down a lot
     "big-pickle",               # popular, rate limited sometimes
 )
 
@@ -47,11 +47,23 @@ SYSTEM_PROMPT = (
 
 TRANSIENT = {429, 500, 502, 503}
 ATTEMPTS = 2          # tries per model before moving on
-RETRY_WAIT = 1.5      # seconds between retries
-ZEN_TIMEOUT = 15
+RETRY_WAIT = 0.8      # seconds between retries
+ZEN_TIMEOUT = 10
+ASK_DEADLINE = 12     # whole race gets this long, then canned lines take over
+
+_gemini_start_at = 0  # index of the model that answered last time
+_zen_start_at = 0
+_http = None          # shared client, keeps tls connections warm
 
 _client = None
 _gemini_dead = False
+
+
+def http():
+    global _http
+    if _http is None:
+        _http = httpx.Client(timeout=ZEN_TIMEOUT)
+    return _http
 
 
 def gemini_models():
@@ -84,19 +96,47 @@ def get_client():
 
 
 def ask(prompt):
-    answer = ask_gemini(prompt)
-    if answer:
-        return answer
-    return ask_zen(prompt)
+    # both providers fire at the same time; first useful text wins.
+    # losers just finish in their corner, nobody waits for them.
+    answers = queue.Queue()
+
+    def run(provider):
+        try:
+            text = provider(prompt)
+        except Exception as e:
+            log.warning("provider blew up: %s", e)
+            return
+        if text:
+            answers.put(text)
+
+    threading.Thread(target=run, args=(ask_gemini,), daemon=True).start()
+    threading.Thread(target=run, args=(ask_zen,), daemon=True).start()
+
+    deadline = time.time() + ASK_DEADLINE
+    while True:
+        left = deadline - time.time()
+        if left <= 0:
+            log.warning("both providers took too long, serving canned")
+            return None
+        try:
+            return answers.get(timeout=left)
+        except queue.Empty:
+            return None
 
 
 def ask_gemini(prompt):
+    global _gemini_start_at
     client = get_client()
     if client is None:
         return None
-    for model in gemini_models():
-        text = try_gemini_model(client, model, prompt)
+    models = gemini_models()
+    # start from whoever won last round instead of always paying
+    # the first model's failure toll again
+    for off in range(len(models)):
+        i = (_gemini_start_at + off) % len(models)
+        text = try_gemini_model(client, models[i], prompt)
         if text:
+            _gemini_start_at = i
             return text
     log.warning("every gemini model failed")
     return None
@@ -111,7 +151,7 @@ def try_gemini_model(client, model, prompt):
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT,
                     temperature=1.3,
-                    max_output_tokens=1000,
+                    max_output_tokens=160,  # two sentences, not an essay
                 ),
             )
             text = (out.text or "").strip()
@@ -139,14 +179,18 @@ def try_gemini_model(client, model, prompt):
 
 
 def ask_zen(prompt):
+    global _zen_start_at
     key = os.environ.get("OPENCODE_API_KEY")
     if not key:
         return None
     url = os.environ.get("OPENCODE_BASE_URL", "https://opencode.ai/zen/v1").rstrip("/")
     headers = {"Authorization": f"Bearer {key}"}
-    for model in zen_models():
-        text = try_zen_model(url + "/chat/completions", headers, model, prompt)
+    models = zen_models()
+    for off in range(len(models)):
+        i = (_zen_start_at + off) % len(models)
+        text = try_zen_model(url + "/chat/completions", headers, models[i], prompt)
         if text:
+            _zen_start_at = i
             return text
     log.warning("every zen model failed")
     return None
@@ -160,11 +204,11 @@ def try_zen_model(url, headers, model, prompt):
             {"role": "user", "content": prompt},
         ],
         "temperature": 1.3,
-        "max_tokens": 300,
+        "max_tokens": 200,
     }
     for attempt in range(1, ATTEMPTS + 1):
         try:
-            r = httpx.post(url, json=body, headers=headers, timeout=ZEN_TIMEOUT)
+            r = http().post(url, json=body, headers=headers)
             if r.status_code == 200:
                 try:
                     text = (r.json()["choices"][0]["message"]["content"] or "").strip()

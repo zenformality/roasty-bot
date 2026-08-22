@@ -10,20 +10,26 @@ HELP_TEXT = (
     "• `/roasty-selfroast` — ruin your own day\n"
     "• `/roasty-chat <message>` — chat mode, I'll be rude about it\n"
     "• `/roasty-help` — this menu\n"
-    "or just @mention me anywhere. I'll find you."
+    "no commands needed: DM me anything and I'll answer. badly."
 )
 
 ROASTS = [
     "{name}, your code doesn't have bugs. It is one.",
-    "Some people bring joy wherever they go. {name} brings it whenever they leave.",
+    "Some people bring joy wherever they go. {name} brings relief when they leave.",
     "{name}, you have two brain cells and they're fighting for third place.",
-    "{name}, I'd explain it to you, but I left my crayons at home.",
+    "{name}, I'd explain it to you, but I don't have crayons and you don't have time.",
     "{name} types like their keyboard owes them money.",
     "{name}, you're the human version of a participation trophy.",
     "{name}, your profile pic is doing more heavy lifting than you ever will.",
     "I've seen group projects with more internal consistency than {name}'s personality.",
     "{name}, replying 'k' to paragraphs is not a communication strategy.",
     "{name}, I'm not calling you slow, but you make dial-up sound futuristic.",
+    "{name}, you're proof natural selection takes requests.",
+    "{name}, mediocrity called. It wants its mascot back.",
+    "If laziness were an Olympic sport, {name} would still find a way to no-show.",
+    "{name}, even autocorrect gave up on you years ago. It just watches now.",
+    "{name}, you have the energy of a group project where everyone else did everything.",
+    "I've met segfaults with more personality than {name}.",
 ]
 
 SELF_ROASTS = [
@@ -33,6 +39,8 @@ SELF_ROASTS = [
     "{name}, this is the most effort you've put into anything all week.",
     "{name}, outsourcing your humiliation was smart. Accuracy is my specialty.",
     "{name}, brave of you to skip the middleman and go straight to the burning.",
+    "{name}, speedrunning dignity loss. New personal best.",
+    "{name}, most people wait for me to notice them first. Eager, aren't we?",
 ]
 
 CHAT_FALLBACKS = [
@@ -42,6 +50,9 @@ CHAT_FALLBACKS = [
     "Interesting take. Wrong, but interesting. Mostly wrong.",
     "I ran your message through my humor module. Zero matches found.",
     "I've seen error messages with more charm than that.",
+    "I've read ransom notes with more coherent arguments.",
+    "Your take just quietly filed for unemployment.",
+    "That was a thought. Barely. But technically a thought.",
 ]
 
 

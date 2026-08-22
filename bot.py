@@ -123,6 +123,30 @@ def mentioned(event, say, client):
     later(burn)
 
 
+@app.event("message")
+def dmed(event, say):
+    # free-range chat: dm the bot anything and it answers, no slash
+    # commands needed. channels stay quiet unless mentioned — replying
+    # to every message is how bots get exiled from servers.
+    if event.get("channel_type") != "im":
+        return
+    # our own replies come back as events too. without this guard we'd
+    # have two very rude bots stuck in an infinite conversation.
+    if event.get("bot_id") or event.get("subtype") or not (event.get("text") or "").strip():
+        return
+
+    text = event["text"].strip()
+
+    def burn():
+        try:
+            say(text=md.to_slack(roaster.chat_roast(text)))
+        except Exception as e:
+            log.error("dm blew up: %s", e)
+            say(text="my comeback was so good it crashed me. you're welcome.")
+
+    later(burn)
+
+
 if __name__ == "__main__":
     print("roasty is up. ctrl+c to end the carnage")
     SocketModeHandler(app, os.environ["SLACK_APP_TOKEN"]).start()

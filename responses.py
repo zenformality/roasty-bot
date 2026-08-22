@@ -24,11 +24,11 @@ ROASTS = [
     "{name} argues in circles so often GPS should sponsor them.",
     "{name}, being forgettable isn't a personality but you've committed to it anyway.",
     "{name}'s last hot take is still cooling on the windowsill of bad ideas.",
-    "{name} joins calls early just to ask if everyone can see their screen.",
+    "{name} is the friend who texts 'on my way' while still in bed.",
     "{name}, I've met NPCs with more depth.",
     "{name} peaks exclusively in arguments nobody else was having.",
     "somewhere a village is missing its idiot. it's {name}.",
-    "{name}, your typing speed is inversely proportional to message quality.",
+    "{name}'s texts read like they're charged per letter. and per thought.",
 ]
 
 SELF_ROASTS = [

@@ -1,5 +1,4 @@
-# canned ammo. used when both ai providers are dead/slow/rate-limited,
-# which happens more often than you'd think on free tiers.
+import random
 
 PING_TEXT = "🏓 Pong! RoastyBot lives. Latency: {latency}ms"
 
@@ -14,61 +13,55 @@ HELP_TEXT = (
 )
 
 ROASTS = [
-    "{name}, your code doesn't have bugs. It is one.",
-    "Some people bring joy wherever they go. {name} brings relief when they leave.",
-    "{name}, you have two brain cells and they're fighting for third place.",
-    "{name}, I'd explain it to you, but I don't have crayons and you don't have time.",
-    "{name} types like their keyboard owes them money.",
-    "{name}, you're the human version of a participation trophy.",
-    "{name}, your profile pic is doing more heavy lifting than you ever will.",
-    "I've seen group projects with more internal consistency than {name}'s personality.",
-    "{name}, replying 'k' to paragraphs is not a communication strategy.",
-    "{name}, I'm not calling you slow, but you make dial-up sound futuristic.",
-    "{name}, you're proof natural selection takes requests.",
-    "{name}, mediocrity called. It wants its mascot back.",
-    "If laziness were an Olympic sport, {name} would still find a way to no-show.",
-    "{name}, even autocorrect gave up on you years ago. It just watches now.",
-    "{name}, you have the energy of a group project where everyone else did everything.",
-    "I've met segfaults with more personality than {name}.",
+    "{name}, every group project you've ever been in remembers you differently than you do.",
+    "{name} reads like someone who skips tutorial videos and then asks what to do.",
+    "{name}, your takes arrive pre-heated from someone smarter.",
+    "I'd call {name} a late bloomer but nothing's blooming.",
+    "{name} has the exact energy of a printer at 4% ink that everyone's afraid to touch.",
+    "{name}, your playlist explains a lot about you and none of it is flattering.",
+    "if {name} had a nickel for every abandoned side project they could afford therapy. wouldn't help though.",
+    "{name}, confidence: high. reasons: pending.",
+    "{name} argues in circles so often GPS should sponsor them.",
+    "{name}, being forgettable isn't a personality but you've committed to it anyway.",
+    "{name}'s last hot take is still cooling on the windowsill of bad ideas.",
+    "{name} joins calls early just to ask if everyone can see their screen.",
+    "{name}, I've met NPCs with more depth.",
+    "{name} peaks exclusively in arguments nobody else was having.",
+    "somewhere a village is missing its idiot. it's {name}.",
+    "{name}, your typing speed is inversely proportional to message quality.",
 ]
 
 SELF_ROASTS = [
-    "{name}, asking a bot to destroy you just proves you already knew.",
-    "{name}, self-awareness looks great on you. Shame nothing else does.",
-    "Most people need enemies for this. {name} volunteered. Iconic.",
-    "{name}, this is the most effort you've put into anything all week.",
-    "{name}, outsourcing your humiliation was smart. Accuracy is my specialty.",
-    "{name}, brave of you to skip the middleman and go straight to the burning.",
-    "{name}, speedrunning dignity loss. New personal best.",
-    "{name}, most people wait for me to notice them first. Eager, aren't we?",
+    "{name} asked a bot for this. let that marinate.",
+    "most people need enemies for this. {name} volunteered. respect.",
+    "{name}, outsourcing your own roasting is the most efficient thing you've done all year.",
+    "don't worry {name}, whatever I say, you've already said worse to yourself in the shower.",
+    "{name} typed that request with their own hands. nobody made them.",
+    "{name}, brave of you to cut out the middleman entirely.",
+    "I'll go easy on {name}. kidding. {name}, you peaked at 'decent' and called it a career.",
+    "{name} is speedrunning dignity loss. any%, no shame category.",
 ]
 
 CHAT_FALLBACKS = [
-    "That message had the energy of Wi-Fi in a basement. Weak and disappointing.",
-    "I'd agree with you, but then we'd both be wrong.",
-    "You type like autocorrect gave up on you years ago.",
-    "Interesting take. Wrong, but interesting. Mostly wrong.",
-    "I ran your message through my humor module. Zero matches found.",
-    "I've seen error messages with more charm than that.",
     "I've read ransom notes with more coherent arguments.",
-    "Your take just quietly filed for unemployment.",
-    "That was a thought. Barely. But technically a thought.",
+    "interesting take. wrong, but delivered with real confidence.",
+    "that had the energy of airport wi-fi. technically present, doing nothing.",
+    "I'd respond properly but you didn't really ask anything, did you.",
+    "my humor module scanned that and returned nothing. honestly kind of impressive.",
+    "you typed all of that and the best part was the send button.",
+    "that was a thought. barely. but technically.",
+    "error messages have said kinder things.",
+    "your take just quietly filed for unemployment.",
 ]
 
 
 def fallback_roast(name):
-    import random
-
     return random.choice(ROASTS).format(name=name)
 
 
 def fallback_selfroast(name):
-    import random
-
     return random.choice(SELF_ROASTS).format(name=name)
 
 
 def fallback_chat():
-    import random
-
     return random.choice(CHAT_FALLBACKS)

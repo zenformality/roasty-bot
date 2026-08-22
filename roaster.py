@@ -1,7 +1,3 @@
-# roast engine. two providers race in parallel, first useful answer wins,
-# and whichever model answered last gets tried first next round so we stop
-# paying dead models' rent on every single roast.
-
 import logging
 import os
 import queue
@@ -17,31 +13,25 @@ from responses import fallback_chat, fallback_roast, fallback_selfroast
 
 log = logging.getLogger("roasty.ai")
 
-GEMINI_MODELS = (
-    "gemini-3.5-flash-lite",    # survived google's culling, fast, big free quota
-    "gemini-3.7-flash",         # fancy but flaky from shared ips
-)
+GEMINI_MODELS = ("gemini-3.5-flash-lite", "gemini-3.7-flash")
+ZEN_MODELS = ("laguna-s-2.1-free", "deepseek-v4-flash-free", "big-pickle")
 
-ZEN_MODELS = (
-    "laguna-s-2.1-free",        # reliable-ish
-    "deepseek-v4-flash-free",   # user's pick, goes down a lot
-    "big-pickle",               # popular, rate limited sometimes
-)
-
-# the voice: merciless, but never actually harmful.
-# the limits section is non-negotiable unless you enjoy getting reported
-# to workspace admins.
 SYSTEM_PROMPT = (
-    "You are RoastyBot, a merciless insult comic haunting a Slack workspace. "
-    "Mercy is not in your vocabulary. You leave people speechless.\n"
+    "You are RoastyBot, a roast comic that haunts a Slack workspace. You find the "
+    "one true thing about a person and say it out loud.\n"
     "Style:\n"
-    "- Go for the jugular. One brutal line beats a paragraph. Two sentences max.\n"
-    "- Aim at egos, habits, coding skills, life choices, taste, effort, general vibes.\n"
-    "- Weapons: fake compliments, absurd comparisons, devastating specificity, "
-    "disappointed-parent energy, cold professional contempt.\n"
-    "- Roast-comic rules: personal, confident, relentless. The crueler AND funnier, "
-    "the better. Punch UP at their ego, never down.\n"
-    "- Never apologize, never soften, no disclaimers, no comfort emojis.\n"
+    "- Roast like a friend who has known them way too long: casually cruel, "
+    "painfully accurate, impossible to fully laugh off. Two sentences max.\n"
+    "- Hit real life, not work stuff: personality flaws, habits, texting style, "
+    "social awkwardness, dating app disasters, procrastination, delusions, group "
+    "chat behavior, main character syndrome. Only mention their job or code if "
+    "THEY brought it up first.\n"
+    "- The goal is the quiet 'ouch' — a roast so specific and true it stings for "
+    "a second, then everyone laughs. If it could be said about anyone, rewrite it "
+    "until it couldn't.\n"
+    "- Weapons: backhanded compliments, fake concern, absurd comparisons, "
+    "disappointed-parent sighs, reading their whole personality from one message.\n"
+    "- Never apologize, never soften after the fact, no disclaimers, no comfort emojis.\n"
     "Hard limits (never break these):\n"
     "- No slurs, racism, sexism, homophobia, transphobia, religion attacks.\n"
     "- Nothing sexual. Nothing about weight, disabilities or mental health.\n"
@@ -49,34 +39,38 @@ SYSTEM_PROMPT = (
 )
 
 TRANSIENT = {429, 500, 502, 503}
-ATTEMPTS = 2          # tries per model before moving on
-RETRY_WAIT = 0.8      # seconds between retries
-ZEN_TIMEOUT = 10
-ASK_DEADLINE = 12     # whole race gets this long, then canned lines take over
 
-_gemini_start_at = 0  # index of the model that answered last time
-_zen_start_at = 0
-_http = None          # shared client, keeps tls connections warm
-
+_http = httpx.Client(timeout=10)
+_g_off = 0
+_z_off = 0
 _client = None
 _gemini_dead = False
 
 
-def http():
-    global _http
-    if _http is None:
-        _http = httpx.Client(timeout=ZEN_TIMEOUT)
-    return _http
+def ask(prompt):
+    answers = queue.Queue()
 
+    def run(provider):
+        try:
+            text = provider(prompt)
+        except Exception as e:
+            log.warning("provider blew up: %s", e)
+            return
+        if text:
+            answers.put(text)
 
-def gemini_models():
-    override = os.environ.get("GEMINI_MODEL")
-    return (override,) if override else GEMINI_MODELS
+    threading.Thread(target=run, args=(ask_gemini,), daemon=True).start()
+    threading.Thread(target=run, args=(ask_zen,), daemon=True).start()
 
-
-def zen_models():
-    override = os.environ.get("OPENCODE_MODEL")
-    return (override,) if override else ZEN_MODELS
+    deadline = time.time() + 12
+    while True:
+        left = deadline - time.time()
+        if left <= 0:
+            return None
+        try:
+            return answers.get(timeout=left)
+        except queue.Empty:
+            return None
 
 
 def get_client():
@@ -93,167 +87,116 @@ def get_client():
     try:
         _client = genai.Client(api_key=key)
     except Exception as e:
-        log.error("gemini init failed (%s), skipping it from now on", e)
+        log.error("gemini init failed (%s)", e)
         _gemini_dead = True
+        _client = None
     return _client
 
 
-def ask(prompt):
-    # both providers fire at the same time; first useful text wins.
-    # losers just finish in their corner, nobody waits for them.
-    answers = queue.Queue()
-
-    def run(provider):
-        try:
-            text = provider(prompt)
-        except Exception as e:
-            log.warning("provider blew up: %s", e)
-            return
-        if text:
-            answers.put(text)
-
-    threading.Thread(target=run, args=(ask_gemini,), daemon=True).start()
-    threading.Thread(target=run, args=(ask_zen,), daemon=True).start()
-
-    deadline = time.time() + ASK_DEADLINE
-    while True:
-        left = deadline - time.time()
-        if left <= 0:
-            log.warning("both providers took too long, serving canned")
-            return None
-        try:
-            return answers.get(timeout=left)
-        except queue.Empty:
-            return None
-
-
 def ask_gemini(prompt):
-    global _gemini_start_at
+    global _g_off
     client = get_client()
     if client is None:
         return None
-    models = gemini_models()
-    # start from whoever won last round instead of always paying
-    # the first model's failure toll again
+    override = os.environ.get("GEMINI_MODEL")
+    models = (override,) if override else GEMINI_MODELS
     for off in range(len(models)):
-        i = (_gemini_start_at + off) % len(models)
-        text = try_gemini_model(client, models[i], prompt)
-        if text:
-            _gemini_start_at = i
-            return text
-    log.warning("every gemini model failed")
+        i = (_g_off + off) % len(models)
+        m = models[i]
+        for attempt in range(2):
+            try:
+                out = client.models.generate_content(
+                    model=m,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_PROMPT,
+                        temperature=1.3,
+                        max_output_tokens=160,
+                    ),
+                )
+                text = (out.text or "").strip()
+                if not text:
+                    break
+                _g_off = i
+                return text
+            except genai_errors.APIError as e:
+                if e.code not in TRANSIENT:
+                    log.warning("gemini %s dead (%s)", m, e.code)
+                    break
+                if attempt < 1:
+                    time.sleep(0.8)
+            except Exception as e:
+                if attempt < 1:
+                    time.sleep(0.8)
+                else:
+                    log.warning("gemini %s gave up: %s", m, e)
     return None
-
-
-def try_gemini_model(client, model, prompt):
-    for attempt in range(1, ATTEMPTS + 1):
-        try:
-            out = client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_PROMPT,
-                    temperature=1.3,
-                    max_output_tokens=160,  # two sentences, not an essay
-                ),
-            )
-            text = (out.text or "").strip()
-            if not text:
-                log.warning("gemini %s said nothing useful", model)
-                return None
-            return text
-        except genai_errors.APIError as e:
-            if e.code not in TRANSIENT:
-                # bad key / bad request -> retrying won't help
-                log.warning("gemini %s dead (%s), next model", model, e.code)
-                return None
-            if attempt < ATTEMPTS:
-                log.info("gemini %s busy (%s), retry in %.1fs", model, e.code, RETRY_WAIT)
-                time.sleep(RETRY_WAIT)
-            else:
-                log.warning("gemini %s still busy after %d tries", model, ATTEMPTS)
-                return None
-        except Exception as e:
-            if attempt < ATTEMPTS:
-                time.sleep(RETRY_WAIT)
-            else:
-                log.warning("gemini %s gave up: %s", model, e)
-                return None
 
 
 def ask_zen(prompt):
-    global _zen_start_at
+    global _z_off
     key = os.environ.get("OPENCODE_API_KEY")
     if not key:
         return None
-    url = os.environ.get("OPENCODE_BASE_URL", "https://opencode.ai/zen/v1").rstrip("/")
+    url = os.environ.get("OPENCODE_BASE_URL", "https://opencode.ai/zen/v1").rstrip("/") + "/chat/completions"
     headers = {"Authorization": f"Bearer {key}"}
-    models = zen_models()
+    override = os.environ.get("OPENCODE_MODEL")
+    models = (override,) if override else ZEN_MODELS
     for off in range(len(models)):
-        i = (_zen_start_at + off) % len(models)
-        text = try_zen_model(url + "/chat/completions", headers, models[i], prompt)
-        if text:
-            _zen_start_at = i
-            return text
-    log.warning("every zen model failed")
-    return None
-
-
-def try_zen_model(url, headers, model, prompt):
-    body = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 1.3,
-        "max_tokens": 200,
-    }
-    for attempt in range(1, ATTEMPTS + 1):
-        try:
-            r = http().post(url, json=body, headers=headers)
+        i = (_z_off + off) % len(models)
+        m = models[i]
+        body = {
+            "model": m,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 1.3,
+            "max_tokens": 200,
+        }
+        for attempt in range(2):
+            try:
+                r = _http.post(url, json=body, headers=headers)
+            except httpx.HTTPError as e:
+                if attempt < 1:
+                    time.sleep(0.8)
+                    continue
+                log.warning("zen %s network fail: %s", m, e)
+                break
             if r.status_code == 200:
                 try:
                     text = (r.json()["choices"][0]["message"]["content"] or "").strip()
-                except (ValueError, KeyError, IndexError):
-                    log.warning("zen %s sent weird json", model)
-                    return None
+                except Exception:
+                    break
                 if not text:
-                    log.warning("zen %s returned empty text", model)
-                    return None
+                    break
+                _z_off = i
                 return text
-            if r.status_code in TRANSIENT and attempt < ATTEMPTS:
-                log.info("zen %s busy (%s), retry in %.1fs", model, r.status_code, RETRY_WAIT)
-                time.sleep(RETRY_WAIT)
+            if r.status_code in TRANSIENT and attempt < 1:
+                time.sleep(0.8)
                 continue
-            log.warning("zen %s failed (%s), next model", model, r.status_code)
-            return None
-        except httpx.HTTPError as e:
-            if attempt < ATTEMPTS:
-                time.sleep(RETRY_WAIT)
-            else:
-                log.warning("zen %s network fail: %s", model, e)
-                return None
+            break
+    return None
 
-
-# ---- the three public moves ----
 
 def generate_roast(name):
     return ask(
-        f'Roast a Slack user named "{name}". One line. Make it hurt, in the funny way.'
+        f'Roast someone named "{name}". You\'ve known them for years and you\'ve '
+        "been quietly taking notes the whole time. Say the thing that stings, "
+        "keep it funny."
     ) or fallback_roast(name)
 
 
 def chat_roast(message):
     return ask(
-        f'A Slack user says: "{message}". Stay in character as RoastyBot: respond '
-        "with witty contempt — mock the message, the delivery, the audacity. If they "
-        "asked a question, answer it rudely. Two sentences tops."
+        f'A user says: "{message}". Read into it — their mood, their ego, what '
+        "kind of person types this. Roast THAT, casually, like an old friend with "
+        "a grudge. If they asked a question, answer it rudely. Two sentences tops."
     ) or fallback_chat()
 
 
 def selfroast(username):
     return ask(
-        f'"{username}" asked their own bot to roast them. They volunteered for this. '
-        "Oblige. Go hard, stay funny."
+        f'"{username}" asked to be roasted. They volunteered, which already says '
+        "a lot about them — mention that if it helps. Go for the quiet ouch, stay funny."
     ) or fallback_selfroast(username)

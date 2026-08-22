@@ -1,14 +1,8 @@
-# ai models speak github-flavored markdown. slack speaks its own dialect,
-# browsers speak html. this translates both ways so nothing shows up as literal asterisks.
-
-
 import html
 import re
 
 
 def to_slack(text):
-    # italics first, otherwise the bold conversion's new single
-    # asterisks get eaten by the italic pass
     t = re.sub(r"(?<!\*)\*(?!\*)([^*]+?)\*(?!\*)", r"_\1_", text, flags=re.S)
     t = re.sub(r"\*\*(.+?)\*\*", r"*\1*", t, flags=re.S)
     t = re.sub(r"^#{1,6}\s*(.+?)\s*$", r"*\1*", t, flags=re.M)

@@ -1,6 +1,3 @@
-# roasty bot. it roasts people. that's the whole pitch.
-# socket mode, so no public url / port forwarding nonsense.
-
 import logging
 import os
 import re
@@ -24,7 +21,6 @@ MENTION = re.compile(r"<@([UW][A-Z0-9]+)")
 
 
 def name_of(client, user_id):
-    # slack profiles are a maze. try the usual spots, give up gracefully
     try:
         u = client.users_info(user=user_id)["user"]
         p = u.get("profile", {})
@@ -34,8 +30,6 @@ def name_of(client, user_id):
 
 
 def later(fn):
-    # ai calls can take ages. slack kills commands after ~3s if we
-    # don't ack, so all slow stuff happens in a throwaway thread
     threading.Thread(target=fn, daemon=True).start()
 
 
@@ -108,14 +102,13 @@ def help_menu(ack, respond):
 @app.event("app_mention")
 def mentioned(event, say, client):
     text = MENTION.sub("", event.get("text", "")).strip()
-    who_id = event.get("user", "")
 
     def burn():
         try:
             if text:
                 say(text=md.to_slack(roaster.chat_roast(text)))
             else:
-                say(text=md.to_slack(roaster.generate_roast(name_of(client, who_id))))
+                say(text=md.to_slack(roaster.generate_roast(name_of(client, event.get("user", "")))))
         except Exception as e:
             log.error("mention blew up: %s", e)
             say(text="i had something devastating ready. the internet ate it.")
@@ -125,21 +118,14 @@ def mentioned(event, say, client):
 
 @app.event("message")
 def dmed(event, say):
-    # free-range chat: dm the bot anything and it answers, no slash
-    # commands needed. channels stay quiet unless mentioned — replying
-    # to every message is how bots get exiled from servers.
     if event.get("channel_type") != "im":
         return
-    # our own replies come back as events too. without this guard we'd
-    # have two very rude bots stuck in an infinite conversation.
     if event.get("bot_id") or event.get("subtype") or not (event.get("text") or "").strip():
         return
 
-    text = event["text"].strip()
-
     def burn():
         try:
-            say(text=md.to_slack(roaster.chat_roast(text)))
+            say(text=md.to_slack(roaster.chat_roast(event["text"].strip())))
         except Exception as e:
             log.error("dm blew up: %s", e)
             say(text="my comeback was so good it crashed me. you're welcome.")

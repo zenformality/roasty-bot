@@ -2,7 +2,6 @@
 
 a slack bot that roasts people. slash commands, @mentions, dms, plus a small web demo.
 
-gemini does the thinking on its free tier. opencode zen races it in parallel and whichever answers first wins, so when google is having a day you usually don't notice. if everything is down there's a pile of pre-written insults so the bot never just sits there silent.
 
 ## using it
 

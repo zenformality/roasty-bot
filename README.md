@@ -89,13 +89,15 @@ slack connection in a thread next to flask).
    - `GEMINI_API_KEY` / `OPENCODE_API_KEY` — ai brains
    - `SLACK_BOT_TOKEN` / `SLACK_APP_TOKEN` — the bot itself
 
-free tier sleeps after ~15 idle minutes, which would kill the slack connection
-too. that's what `.github/workflows/keep-alive.yml` is for: a github actions
-cron pokes the demo url every 10 minutes. after your first deploy, add your url
-to the repo's **settings → secrets and variables → actions** as `DEMO_URL`.
+free tier sleeps after ~15 idle minutes, which kills the slack connection too.
+so something pokes the demo url forever:
 
-heads up: github disables scheduled workflows after ~60 days without any
-commits. pushing literally anything resets the clock.
+1. **primary — [cron-job.org](https://cron-job.org)** (free): create a cronjob
+   that GETs your demo url every 5 minutes. precise timers, zero maintenance.
+2. **backup — `.github/workflows/keep-alive.yml`**: a github actions cron doing
+   the same thing. fair warning: github delays scheduled runs by 20-55+ min,
+   so it can't keep things warm alone — it's the safety net (and fails loudly
+   if the site is down). needs `DEMO_URL` set in repo secrets.
 
 ## when stuff breaks
 

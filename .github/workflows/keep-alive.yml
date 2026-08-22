@@ -1,12 +1,17 @@
-# render's free tier sleeps after ~15 idle minutes, which would kill the
-# slack connection too. this pokes the demo url every 10 minutes to keep
-# it warm.
+# render's free tier sleeps after ~15 idle minutes, which kills the slack
+# connection too.
 #
-# after the first render deploy: repo settings -> secrets and variables ->
-# actions -> add DEMO_URL (e.g. https://roasty-bot-demo.onrender.com)
+# PRIMARY keep-alive: cron-job.org (precise timers). set it up once:
+#   cron-job.org -> create cronjob -> GET https://roasty-bot-demo.onrender.com
+#   -> schedule: every 5 minutes -> save. done.
 #
-# heads up: github disables scheduled workflows after ~60 days without any
-# commits. pushing literally anything resets the clock.
+# THIS workflow is only a backup net, because github's free runners delay
+# scheduled jobs by 20-55+ minutes (way past render's 15-min nap window).
+# it fails LOUDLY on purpose when the site doesn't answer, so a red x here
+# means the demo url is actually broken.
+#
+# heads up: github also disables scheduled workflows after ~60 days without
+# any commits. pushing literally anything resets the clock.
 
 name: keep-alive
 
@@ -20,4 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: poke the bot
-        run: curl -sf --max-time 30 "${{ secrets.DEMO_URL }}" || echo "asleep or DEMO_URL not set yet"
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 "${{ secrets.DEMO_URL }}")
+          echo "got HTTP $code"
+          test "$code" = "200"

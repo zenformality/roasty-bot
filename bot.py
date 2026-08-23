@@ -21,6 +21,9 @@ BOT_ID = app.client.auth_test()["user_id"]
 
 MENTION = re.compile(r"<@([UW][A-Z0-9]+)")
 AMBIENT_MINUTES = float(os.environ.get("AMBIENT_MINUTES", "90"))
+CHANNEL_COOLDOWN = float(os.environ.get("CHANNEL_REPLY_COOLDOWN", "10"))
+
+_last_reply = {}
 
 
 def name_of(client, user_id):
@@ -34,6 +37,14 @@ def name_of(client, user_id):
 
 def later(fn):
     threading.Thread(target=fn, daemon=True).start()
+
+
+def cooled_down(channel):
+    now = time.time()
+    if now - _last_reply.get(channel, 0) < CHANNEL_COOLDOWN:
+        return False
+    _last_reply[channel] = now
+    return True
 
 
 def humans_in(client, channel):
@@ -134,17 +145,28 @@ def mentioned(event, say, client):
 
 
 @app.event("message")
-def dmed(event, say):
-    if event.get("channel_type") != "im":
+def spoken_to(event, say):
+    kind = event.get("channel_type")
+    if kind not in ("im", "channel"):
+        return
+    # mentions are the app_mention handler's job; answering here too would
+    # fire two roasts at once
+    if f"<@{BOT_ID}>" in (event.get("text") or ""):
         return
     if event.get("bot_id") or event.get("subtype") or not (event.get("text") or "").strip():
         return
 
+    ch = event["channel"]
+    if kind != "im" and not cooled_down(ch):
+        return
+
+    text = event["text"].strip()
+
     def burn():
         try:
-            say(text=md.to_slack(roaster.chat_roast(event["text"].strip())))
+            say(text=md.to_slack(roaster.chat_roast(text)))
         except Exception as e:
-            log.error("dm blew up: %s", e)
+            log.error("%s reply blew up: %s", kind, e)
             say(text="my comeback was so good it crashed me. you're welcome.")
 
     later(burn)

@@ -8,12 +8,14 @@ it also shows up on its own: when you add it to a channel it says hi (and picks 
 
 five slash commands: `/roasty-roast @user`, `/roasty-selfroast`, `/roasty-chat <message>`, `/roasty-ping`, `/roasty-help`.
 
-you can also @mention it anywhere, or dm it whatever you want. dms need no command at all. channels only get responses when it's actually addressed, because bots that reply to everything get exiled from servers fast.
+you can also just @mention it anywhere, or dm it whatever you want.
+
+invite it to a channel and it reads the room: replies to what people say (one reply per channel every few seconds, so it doesn't machine-gun), introduces itself when added, and drops an unsolicited roast roughly every 90 minutes (`AMBIENT_MINUTES=0` disables the wandering, `CHANNEL_REPLY_COOLDOWN` tunes the reply pace). remove it from a channel and it goes deaf there instantly.
 
 ## setup
 
 1. slack app at [api.slack.com/apps](https://api.slack.com/apps), from scratch. enable socket mode, which walks you through making the app-level token (`xapp-`). under oauth & permissions add scopes: `chat:write`, `commands`, `app_mentions:read`, `channels:history`, `channels:read`. install to workspace and grab the bot token (`xoxb-`).
-2. under event subscriptions → subscribe to bot events, add `member_joined_channel` and `message.im` (plus `app_mention` via the `app_mentions:read` scope). then create the five slash commands with the exact same names, case-sensitive. slack insists on a request url even though socket mode ignores it entirely, put whatever.
+2. under event subscriptions → subscribe to bot events, add `member_joined_channel`, `message.im` and `message.channels` (plus `app_mention` via the `app_mentions:read` scope). then create the five slash commands with the exact same names, case-sensitive. slack insists on a request url even though socket mode ignores it entirely, put whatever.
 3. free gemini key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey). optional second opinion from [opencode.ai/auth](https://opencode.ai/auth). either one goes in `.env` (copy `.env.example`). both providers race each request; set `GEMINI_MODEL` or `OPENCODE_MODEL` to pin a specific model instead of the built-in chains.
 
 then:

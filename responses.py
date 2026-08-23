@@ -4,27 +4,27 @@ PING_TEXT = "🏓 Pong! RoastyBot lives. Latency: {latency}ms"
 
 HELP_TEXT = (
     "*RoastyBot 🔥 — the arsenal*\n"
-    "• `/roasty-ping` — health check\n"
     "• `/roasty-roast @user` — ruin someone's day\n"
     "• `/roasty-selfroast` — ruin your own day\n"
     "• `/roasty-chat <message>` — chat mode, I'll be rude about it\n"
+    "• `/roasty-ping` — health check\n"
     "• `/roasty-help` — this menu\n"
-    "no commands needed: DM me anything and I'll answer. badly.\n"
-    "also: add me to a channel and I introduce myself. I drop by on my own too."
+    "no commands needed: @mention me anywhere, or DM me anything.\n"
+    "and if I'm in your channel I read everything. expect commentary."
 )
 
 ROASTS = [
     "{name}, every group project you've ever been in remembers you differently than you do.",
-    "{name} reads like someone who skips tutorial videos and then asks what to do.",
+    "{name}, people don't dislike you enough to be enemies. that's the brutal part.",
+    "{name}, nobody has ever wondered what you're up to.",
+    "{name}, even your closest friends pause before describing you.",
     "{name}, your takes arrive pre-heated from someone smarter.",
     "I'd call {name} a late bloomer but nothing's blooming.",
     "{name} has the exact energy of a printer at 4% ink that everyone's afraid to touch.",
     "{name}, your playlist explains a lot about you and none of it is flattering.",
     "if {name} had a nickel for every abandoned side project they could afford therapy. wouldn't help though.",
     "{name}, confidence: high. reasons: pending.",
-    "{name} argues in circles so often GPS should sponsor them.",
     "{name}, being forgettable isn't a personality but you've committed to it anyway.",
-    "{name}'s last hot take is still cooling on the windowsill of bad ideas.",
     "{name} is the friend who texts 'on my way' while still in bed.",
     "{name}, I've met NPCs with more depth.",
     "{name} peaks exclusively in arguments nobody else was having.",
@@ -34,6 +34,7 @@ ROASTS = [
 
 SELF_ROASTS = [
     "{name} asked a bot for this. let that marinate.",
+    "{name}, asking a machine means the humans gave up years ago.",
     "most people need enemies for this. {name} volunteered. respect.",
     "{name}, outsourcing your own roasting is the most efficient thing you've done all year.",
     "don't worry {name}, whatever I say, you've already said worse to yourself in the shower.",
@@ -48,7 +49,7 @@ CHAT_FALLBACKS = [
     "interesting take. wrong, but delivered with real confidence.",
     "that had the energy of airport wi-fi. technically present, doing nothing.",
     "I'd respond properly but you didn't really ask anything, did you.",
-    "my humor module scanned that and returned nothing. honestly kind of impressive.",
+    "you said that with your whole chest and absolutely nothing behind it.",
     "you typed all of that and the best part was the send button.",
     "that was a thought. barely. but technically.",
     "error messages have said kinder things.",

@@ -1,0 +1,14 @@
+[Unit]
+Description=roasty (flask demo + slack bot)
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/roasty-bot
+ExecStart=%h/roasty-bot/venv/bin/gunicorn -b 127.0.0.1:8080 web:app -w 1 --threads 8
+EnvironmentFile=%h/roasty-bot/.env
+Environment=RUN_SLACK_BOT=1
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

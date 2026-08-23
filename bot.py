@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import re
 import threading
 import time
@@ -16,8 +17,10 @@ load_dotenv()
 log = logging.getLogger("roasty")
 
 app = App(token=os.environ["SLACK_BOT_TOKEN"])
+BOT_ID = app.client.auth_test()["user_id"]
 
 MENTION = re.compile(r"<@([UW][A-Z0-9]+)")
+AMBIENT_MINUTES = float(os.environ.get("AMBIENT_MINUTES", "90"))
 
 
 def name_of(client, user_id):
@@ -31,6 +34,20 @@ def name_of(client, user_id):
 
 def later(fn):
     threading.Thread(target=fn, daemon=True).start()
+
+
+def humans_in(client, channel):
+    try:
+        ids = [u for u in client.conversations_members(channel=channel, limit=200)["members"] if u != BOT_ID]
+        if ids:
+            return ids
+    except Exception:
+        pass
+    try:
+        hist = client.conversations_history(channel=channel, limit=100)["messages"]
+        return list({m["user"] for m in hist if m.get("user") and m.get("user") != BOT_ID})
+    except Exception:
+        return []
 
 
 @app.command("/roasty-ping")
@@ -131,6 +148,58 @@ def dmed(event, say):
             say(text="my comeback was so good it crashed me. you're welcome.")
 
     later(burn)
+
+
+@app.event("member_joined_channel")
+def joined(event, say, client):
+    if event.get("user") != BOT_ID:
+        return
+
+    def burn():
+        try:
+            uid = event.get("inviter")
+            if not uid or uid == BOT_ID:
+                pool = humans_in(client, event["channel"])
+                uid = random.choice(pool) if pool else None
+            if uid:
+                name = name_of(client, uid)
+                say(text=f"well well well. thanks for letting me in, {name}. {md.to_slack(roaster.generate_roast(name))}")
+            else:
+                say(text="hi. i'm roasty. i live here now.")
+        except Exception as e:
+            log.error("join blew up: %s", e)
+
+    later(burn)
+
+
+def ambient():
+    while True:
+        time.sleep(AMBIENT_MINUTES * 60 * random.uniform(0.75, 1.25))
+        try:
+            chans = [
+                c["id"]
+                for c in app.client.conversations_list(
+                    types="public_channel", exclude_archived=True, limit=200
+                )["channels"]
+                if c.get("is_member")
+            ]
+            random.shuffle(chans)
+            for ch in chans[:4]:
+                pool = humans_in(app.client, ch)
+                if not pool:
+                    continue
+                name = name_of(app.client, random.choice(pool))
+                app.client.chat_postMessage(
+                    channel=ch,
+                    text=f"nobody asked but {name}: {md.to_slack(roaster.generate_roast(name))}",
+                )
+                break
+        except Exception as e:
+            log.error("ambient blew up: %s", e)
+
+
+if AMBIENT_MINUTES > 0:
+    threading.Thread(target=ambient, daemon=True).start()
 
 
 if __name__ == "__main__":

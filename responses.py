@@ -9,7 +9,8 @@ HELP_TEXT = (
     "• `/roasty-selfroast` — ruin your own day\n"
     "• `/roasty-chat <message>` — chat mode, I'll be rude about it\n"
     "• `/roasty-help` — this menu\n"
-    "no commands needed: DM me anything and I'll answer. badly."
+    "no commands needed: DM me anything and I'll answer. badly.\n"
+    "also: add me to a channel and I introduce myself. I drop by on my own too."
 )
 
 ROASTS = [
